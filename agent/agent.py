@@ -161,7 +161,12 @@ class SkillAgent:
 
             i += 1
 
-        return tools if tools else self._get_default_tools()
+        if not tools:
+            raise ValueError(
+                f"No tools found in skill.md for '{self.skill_name}'. "
+                "Ensure skill.md has a '## Tool Reference' section with tool definitions."
+            )
+        return tools
 
     def _build_use_case_map(self, lines: list) -> dict:
         """Build a mapping from tool names to descriptions from the Use Case table."""
@@ -246,110 +251,6 @@ class SkillAgent:
                 break
 
         return schema
-
-    def _get_default_tools(self) -> list:
-        """Fallback hardcoded tools if parsing fails."""
-        return [
-            {
-                "name": "solenoid_field",
-                "description": "Compute magnetic field at the center of a solenoid using B = μ₀ · n · I",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "turns": {"type": "integer", "description": "Number of turns"},
-                        "length_m": {"type": "number", "description": "Length in meters"},
-                        "current_A": {"type": "number", "description": "Current in amperes"},
-                    },
-                    "required": ["turns", "length_m", "current_A"],
-                },
-            },
-            {
-                "name": "biot_savart_wire",
-                "description": "Compute magnetic field at distance r from an infinite straight wire using B = μ₀I / (2πr)",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "current_A": {"type": "number", "description": "Current in amperes"},
-                        "distance_m": {"type": "number", "description": "Distance from wire in meters"},
-                    },
-                    "required": ["current_A", "distance_m"],
-                },
-            },
-            {
-                "name": "magnetic_flux",
-                "description": "Compute magnetic flux through a surface using Φ = B · A · cos(θ)",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "B_tesla": {"type": "number", "description": "Flux density in Tesla"},
-                        "area_m2": {"type": "number", "description": "Area in square meters"},
-                        "angle_deg": {"type": "number", "description": "Angle in degrees (default 0)"},
-                    },
-                    "required": ["B_tesla", "area_m2"],
-                },
-            },
-            {
-                "name": "reluctance",
-                "description": "Compute reluctance of a magnetic circuit path using R = l / (μ₀ · μr · A)",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "length_m": {"type": "number", "description": "Path length in meters"},
-                        "area_m2": {"type": "number", "description": "Cross-sectional area in m²"},
-                        "relative_permeability": {"type": "number", "description": "Material's μᵣ"},
-                    },
-                    "required": ["length_m", "area_m2", "relative_permeability"],
-                },
-            },
-            {
-                "name": "mmf_required",
-                "description": "Compute magnetomotive force (MMF) using MMF = H · l",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "H_field": {"type": "number", "description": "Field strength in A/m"},
-                        "path_length_m": {"type": "number", "description": "Path length in meters"},
-                    },
-                    "required": ["H_field", "path_length_m"],
-                },
-            },
-            {
-                "name": "energy_stored",
-                "description": "Compute energy stored in a magnetic field using W = (B² / (2μ₀)) · Volume",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "B_tesla": {"type": "number", "description": "Flux density in Tesla"},
-                        "volume_m3": {"type": "number", "description": "Volume in m³"},
-                    },
-                    "required": ["B_tesla", "volume_m3"],
-                },
-            },
-            {
-                "name": "material_lookup",
-                "description": "Return properties of a named magnetic material",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "material": {"type": "string", "description": "Material name (e.g., 'iron', 'ferrite')"},
-                    },
-                    "required": ["material"],
-                },
-            },
-            {
-                "name": "unit_convert",
-                "description": "Convert between magnetic units (T↔Gauss, Wb↔Maxwell, A/m↔Oersted, H↔mH↔uH)",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "value": {"type": "number", "description": "Value to convert"},
-                        "from_unit": {"type": "string", "description": "Source unit"},
-                        "to_unit": {"type": "string", "description": "Target unit"},
-                    },
-                    "required": ["value", "from_unit", "to_unit"],
-                },
-            },
-        ]
 
     def _setup_tools(self) -> list:
         """Set up tool definitions by parsing from skill.md."""
