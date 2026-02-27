@@ -44,17 +44,16 @@ Key features:
 
 ```
 magnetics-sme/
-├── mcp_server/
-│   ├── server.py              # MCP server (stdio transport)
-│   ├── __init__.py
-│   └── tools/
-│       ├── fields.py          # B/H field calculations (solenoid, wire, flux, energy)
-│       ├── circuits.py        # Reluctance, MMF calculations
-│       ├── materials.py       # Material property lookup (6 common materials)
-│       ├── converters.py      # Unit conversions (T↔Gauss, Wb↔Maxwell, etc.)
-│       └── __init__.py
 ├── agent/
-│   ├── agent.py               # SME agent with agentic loop
+│   ├── agent.py               # SME agent with agentic loop & interactive chat
+│   └── __init__.py
+├── mcp_server/
+│   ├── tools/
+│   │   ├── fields.py          # B/H field calculations (solenoid, wire, flux, energy)
+│   │   ├── circuits.py        # Reluctance, MMF calculations
+│   │   ├── materials.py       # Material property lookup (6 common materials)
+│   │   ├── converters.py      # Unit conversions (T↔Gauss, Wb↔Maxwell, etc.)
+│   │   └── __init__.py
 │   └── __init__.py
 ├── tests/
 │   ├── test_fields.py         # Field calculation tests
@@ -62,7 +61,9 @@ magnetics-sme/
 │   ├── test_materials.py      # Material lookup tests
 │   ├── test_converters.py     # Conversion tests
 │   └── __init__.py
+├── SYSTEM_PROMPT.md           # Agent skill definition (reusable prompt)
 ├── requirements.txt           # Python dependencies
+├── .gitignore
 └── README.md                  # This file
 ```
 
@@ -107,21 +108,32 @@ export ANTHROPIC_API_KEY="your-key-here"
 
 ## Running the Agent
 
-### Interactive Agent with Example Queries
+### Interactive Chat Interface
 
 ```bash
 python agent/agent.py
 ```
 
-This will:
-1. Start the MCP server as a subprocess
-2. Discover all available tools via MCP
-3. Run three example queries demonstrating the agent's capabilities:
-   - Solenoid field calculation
-   - Magnetic circuit reluctance
-   - Energy storage in a magnetic field
+This launches an interactive chat where you can:
+- Select from 5 example prompts (by number 1-5)
+- Type your own custom questions
+- See animated thinking spinner while Claude responds
+- Type `quit` or `exit` to exit
 
-**Example Output:**
+The agent loads its expertise from `SYSTEM_PROMPT.md`, which defines its knowledge domain and reasoning approach.
+
+## Agent Skill Definition (SYSTEM_PROMPT.md)
+
+The `SYSTEM_PROMPT.md` file functions as a **reusable skill definition**:
+
+- **Defines domain expertise**: Maxwell's equations, magnetic circuits, material properties
+- **Specifies reasoning approach**: Identify principle → Apply tools → Explain reasoning → Include units
+- **Guides behavior**: Tone, assumptions, available resources
+- **Easy to customize**: Edit the markdown file without touching code
+
+To modify the agent's expertise or behavior, simply edit `SYSTEM_PROMPT.md`. The agent will load the updated definition on next run. This pattern mirrors how Claude Code handles skill definitions—keeping the "what" (skill definition) separate from the "how" (implementation).
+
+### Example Output:
 ```
 Starting MCP server...
 ✓ MCP server started with 8 tools
