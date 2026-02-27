@@ -239,8 +239,12 @@ async def call_tool(name: str, arguments: dict):
 
 async def main():
     """Run the MCP server."""
-    async with app.run():
-        pass
+    import asyncio
+    from mcp.server.stdio import stdio_server
+
+    # Run the server with stdio transport
+    async with stdio_server() as streams:
+        await app.run(streams[0], streams[1], asyncio.Event())
 
 
 if __name__ == "__main__":

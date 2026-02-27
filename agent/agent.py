@@ -1,99 +1,156 @@
 #!/usr/bin/env python3
-"""Magnetics SME Agent using Anthropic SDK with MCP server."""
+"""Magnetics SME Agent using Anthropic SDK."""
 
 import asyncio
 import json
 import os
-import subprocess
 import sys
-from typing import Optional
+
+# Add parent directory to path so we can import mcp_server
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from anthropic import Anthropic
-from mcp.client.stdio import stdio_client
+
+# Import tools directly
+from mcp_server.tools import fields, circuits, materials, converters
 
 
 class MagneticsSMEAgent:
-    """Agent with expertise in magnetics/electromagnetics powered by an MCP server."""
+    """Agent with expertise in magnetics/electromagnetics."""
 
     def __init__(self):
-        """Initialize the agent with MCP server and Anthropic client."""
+        """Initialize the agent."""
         self.client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         self.model = "claude-sonnet-4-6"
-        self.tools = []
-        self.server_process = None
-        self.mcp_session = None
+        self.tools = self._setup_tools()
 
-    async def start_mcp_server(self) -> bool:
-        """
-        Start the MCP server as a subprocess and discover tools.
+    def _setup_tools(self) -> list:
+        """Set up tool definitions for Claude."""
+        return [
+            {
+                "name": "solenoid_field",
+                "description": "Compute magnetic field at the center of a solenoid using B = μ₀ · n · I",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "turns": {"type": "integer", "description": "Number of turns"},
+                        "length_m": {"type": "number", "description": "Length in meters"},
+                        "current_A": {"type": "number", "description": "Current in amperes"},
+                    },
+                    "required": ["turns", "length_m", "current_A"],
+                },
+            },
+            {
+                "name": "biot_savart_wire",
+                "description": "Compute magnetic field at distance r from an infinite straight wire using B = μ₀I / (2πr)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "current_A": {"type": "number", "description": "Current in amperes"},
+                        "distance_m": {"type": "number", "description": "Distance from wire in meters"},
+                    },
+                    "required": ["current_A", "distance_m"],
+                },
+            },
+            {
+                "name": "magnetic_flux",
+                "description": "Compute magnetic flux through a surface using Φ = B · A · cos(θ)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "B_tesla": {"type": "number", "description": "Flux density in Tesla"},
+                        "area_m2": {"type": "number", "description": "Area in square meters"},
+                        "angle_deg": {"type": "number", "description": "Angle in degrees (default 0)"},
+                    },
+                    "required": ["B_tesla", "area_m2"],
+                },
+            },
+            {
+                "name": "reluctance",
+                "description": "Compute reluctance of a magnetic circuit path using R = l / (μ₀ · μr · A)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "length_m": {"type": "number", "description": "Path length in meters"},
+                        "area_m2": {"type": "number", "description": "Cross-sectional area in m²"},
+                        "relative_permeability": {"type": "number", "description": "Material's μᵣ"},
+                    },
+                    "required": ["length_m", "area_m2", "relative_permeability"],
+                },
+            },
+            {
+                "name": "mmf_required",
+                "description": "Compute magnetomotive force (MMF) using MMF = H · l",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "H_field": {"type": "number", "description": "Field strength in A/m"},
+                        "path_length_m": {"type": "number", "description": "Path length in meters"},
+                    },
+                    "required": ["H_field", "path_length_m"],
+                },
+            },
+            {
+                "name": "energy_stored",
+                "description": "Compute energy stored in a magnetic field using W = (B² / (2μ₀)) · Volume",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "B_tesla": {"type": "number", "description": "Flux density in Tesla"},
+                        "volume_m3": {"type": "number", "description": "Volume in m³"},
+                    },
+                    "required": ["B_tesla", "volume_m3"],
+                },
+            },
+            {
+                "name": "material_lookup",
+                "description": "Return properties of a named magnetic material",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "material": {"type": "string", "description": "Material name (e.g., 'iron', 'ferrite')"},
+                    },
+                    "required": ["material"],
+                },
+            },
+            {
+                "name": "unit_convert",
+                "description": "Convert between magnetic units (T↔Gauss, Wb↔Maxwell, A/m↔Oersted, H↔mH↔uH)",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "number", "description": "Value to convert"},
+                        "from_unit": {"type": "string", "description": "Source unit"},
+                        "to_unit": {"type": "string", "description": "Target unit"},
+                    },
+                    "required": ["value", "from_unit", "to_unit"],
+                },
+            },
+        ]
 
-        Returns:
-            True if server started successfully, False otherwise
-        """
+    def call_tool(self, tool_name: str, tool_input: dict) -> str:
+        """Execute a tool and return the result."""
         try:
-            # Start the MCP server subprocess
-            self.server_process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "mcp_server/server.py",
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            if tool_name == "solenoid_field":
+                result = fields.solenoid_field(**tool_input)
+            elif tool_name == "biot_savart_wire":
+                result = fields.biot_savart_wire(**tool_input)
+            elif tool_name == "magnetic_flux":
+                result = fields.magnetic_flux(**tool_input)
+            elif tool_name == "reluctance":
+                result = circuits.reluctance(**tool_input)
+            elif tool_name == "mmf_required":
+                result = circuits.mmf_required(**tool_input)
+            elif tool_name == "energy_stored":
+                result = fields.energy_stored(**tool_input)
+            elif tool_name == "material_lookup":
+                result = materials.lookup_material(**tool_input)
+            elif tool_name == "unit_convert":
+                result = converters.convert_unit(**tool_input)
+            else:
+                result = {"error": f"Unknown tool: {tool_name}"}
 
-            # Connect to the server via stdio
-            self.mcp_session = stdio_client(
-                self.server_process.stdout,
-                self.server_process.stdin
-            )
-
-            async with self.mcp_session as session:
-                # Get tools from MCP server
-                tools_response = await session.list_tools()
-                self.tools = self._convert_mcp_tools_to_anthropic(tools_response.tools)
-
-            return True
-
-        except Exception as e:
-            print(f"Error starting MCP server: {e}")
-            return False
-
-    def _convert_mcp_tools_to_anthropic(self, mcp_tools) -> list:
-        """
-        Convert MCP tool schemas to Anthropic format.
-
-        Args:
-            mcp_tools: Tools from MCP server
-
-        Returns:
-            List of tools in Anthropic format
-        """
-        anthropic_tools = []
-        for tool in mcp_tools:
-            anthropic_tools.append({
-                "name": tool.name,
-                "description": tool.description,
-                "input_schema": tool.inputSchema,
-            })
-        return anthropic_tools
-
-    async def call_tool(self, tool_name: str, tool_input: dict) -> str:
-        """
-        Execute a tool via the MCP server.
-
-        Args:
-            tool_name: Name of the tool to call
-            tool_input: Input parameters for the tool
-
-        Returns:
-            Tool result as a string
-        """
-        try:
-            async with self.mcp_session as session:
-                result = await session.call_tool(tool_name, tool_input)
-                # Extract text content from result
-                if result.content and len(result.content) > 0:
-                    return result.content[0].text
-                return json.dumps({"error": "Empty result from tool"})
+            return json.dumps(result)
         except Exception as e:
             return json.dumps({"error": f"Tool execution failed: {str(e)}"})
 
@@ -117,13 +174,8 @@ When solving problems:
 You have access to a set of magnetics calculation tools. Use them whenever
 numerical computation is required rather than estimating by hand."""
 
-    async def run_agentic_loop(self, user_message: str) -> None:
-        """
-        Run the main agentic loop.
-
-        Args:
-            user_message: The initial user query
-        """
+    def run_agentic_loop(self, user_message: str) -> None:
+        """Run the main agentic loop."""
         messages = [{"role": "user", "content": user_message}]
 
         print(f"\n{'='*70}")
@@ -166,7 +218,7 @@ numerical computation is required rather than estimating by hand."""
                         print(f"   Input: {json.dumps(tool_input, indent=2)}")
 
                         # Execute tool
-                        result = await self.call_tool(tool_name, tool_input)
+                        result = self.call_tool(tool_name, tool_input)
                         result_obj = json.loads(result)
 
                         print(f"   Result: {json.dumps(result_obj, indent=2)}\n")
@@ -186,27 +238,12 @@ numerical computation is required rather than estimating by hand."""
                 print(f"Unexpected stop reason: {response.stop_reason}")
                 break
 
-    async def cleanup(self) -> None:
-        """Clean up resources."""
-        if self.server_process:
-            self.server_process.terminate()
-            try:
-                await asyncio.wait_for(self.server_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.server_process.kill()
 
-
-async def main():
+def main():
     """Main entry point."""
     agent = MagneticsSMEAgent()
 
-    # Start MCP server
-    print("Starting MCP server...")
-    if not await agent.start_mcp_server():
-        print("Failed to start MCP server")
-        sys.exit(1)
-
-    print(f"✓ MCP server started with {len(agent.tools)} tools\n")
+    print(f"✓ Agent initialized with {len(agent.tools)} tools\n")
 
     # Example questions
     test_queries = [
@@ -217,12 +254,12 @@ async def main():
 
     try:
         for query in test_queries:
-            await agent.run_agentic_loop(query)
+            agent.run_agentic_loop(query)
             print("\n")
 
-    finally:
-        await agent.cleanup()
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

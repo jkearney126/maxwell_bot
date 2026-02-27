@@ -1,6 +1,6 @@
 # Magnetics SME Agent + MCP Server
 
-A portfolio project demonstrating an AI agent with domain expertise in electromagnetics and magnetics, powered by a custom MCP (Model Context Protocol) server that provides physics computation tools.
+A sample project demonstrating an AI agent with domain expertise in electromagnetics and magnetics, powered by a custom MCP (Model Context Protocol) server that provides physics computation tools.
 
 ## Project Overview
 
