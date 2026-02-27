@@ -178,24 +178,17 @@ class MagneticsSMEAgent:
             return json.dumps({"error": f"Tool execution failed: {str(e)}"})
 
     def get_system_prompt(self) -> str:
-        """Return the system prompt for the SME agent."""
-        return """You are a Senior Magnetics Engineer and physicist with deep expertise in:
-- Maxwell's equations and their physical interpretations
-- Static and dynamic magnetic field analysis
-- Magnetic circuit design (reluctance, MMF, flux)
-- Soft and hard magnetic materials
-- Inductors, transformers, and electromagnet design
-- SI and CGS unit systems for magnetics
-
-When solving problems:
-1. Identify the relevant physical principle or equation
-2. Use the available tools to perform calculations precisely
-3. Show your reasoning — explain what equation applies and why
-4. Call out any assumptions (e.g. uniform field, linear material)
-5. Always include units in your final answer
-
-You have access to a set of magnetics calculation tools. Use them whenever
-numerical computation is required rather than estimating by hand."""
+        """Load system prompt from SYSTEM_PROMPT.md file."""
+        prompt_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "SYSTEM_PROMPT.md"
+        )
+        try:
+            with open(prompt_path, "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            # Fallback prompt if file not found
+            return "You are an expert in electromagnetics and magnetics. Use the available tools to help solve physics problems."
 
     def run_agentic_loop(self, user_message: str) -> None:
         """Run the main agentic loop."""
