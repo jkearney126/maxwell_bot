@@ -4,7 +4,7 @@ A sample project demonstrating an AI agent with domain expertise in electromagne
 
 ## Project Overview
 
-This project showcases a **Senior Magnetics Engineer** AI agent that leverages the Anthropic SDK and a custom MCP server to perform expert-level analysis and calculations in electromagnetics. The agent understands Maxwell's equations, magnetic circuit design, material properties, and can reason through complex physics problems using real equations and precise numerical computations.
+This project showcases a subject matter expert AI agent that leverages the Anthropic SDK and a custom MCP server to perform expert-level analysis and calculations in electromagnetics. The agent understands Maxwell's equations, magnetic circuit design, material properties, and can reason through complex physics problems using real equations and precise numerical computations.
 
 Key features:
 - **Hand-rolled agentic loop** (no framework dependencies) for transparent agent reasoning
@@ -76,7 +76,8 @@ magnetics-sme/
 ### Step 1: Clone or Download the Project
 
 ```bash
-cd magnetics-sme
+git clone https://github.com/jkearney126/maxwell_bot.git
+cd maxwell_bot
 ```
 
 ### Step 2: Create a Virtual Environment (Recommended)
@@ -375,78 +376,6 @@ Output: 12000 Gauss
 
 ---
 
-## Design Decisions
-
-### 1. **No Agent Framework**
-The agentic loop is implemented manually (not using LangChain, AutoGen, etc.) to demonstrate:
-- Clear understanding of the agent pattern
-- Transparent message flow and tool execution
-- Direct control over system prompts and tool definitions
-
-### 2. **MCP Server as Separate Process**
-The MCP server runs as a **real subprocess**, not a mock:
-- Tools communicate via stdio JSON-RPC (standard MCP)
-- Clear separation of concerns: agent reasoning vs. computation
-- Demonstrates production-ready architecture
-- Easy to swap tools or extend with FEA, simulation, etc.
-
-### 3. **Real Physics Equations**
-Tools use actual constants and equations:
-- μ₀ = 4π × 10⁻⁷ H/m (permeability of free space)
-- Proper unit handling and validation
-- Realistic material properties from engineering literature
-
-### 4. **SME Persona**
-The system prompt is not decorative—it actively shapes Claude's reasoning:
-- Emphasizes physical principles before calculations
-- Asks for assumptions and limitations
-- Ensures units are included in answers
-- Guides tool selection and multi-step problem solving
-
----
-
-## Extension Ideas
-
-### 1. **Add FEA Integration**
-Integrate a finite element analysis tool (e.g., COMSOL API, Ansys):
-- `magnetic_fea_simulation` tool for 3D field visualization
-- Non-linear material models
-
-### 2. **Multi-Agent Routing**
-Use a router agent to dispatch questions:
-- Fields & circuits → magnetics SME
-- Thermal analysis → thermal engineer SME
-- Mechanical design → mechanical engineer SME
-
-### 3. **Interactive REPL**
-Replace hardcoded example queries with an interactive prompt:
-```bash
-python -m agent.interactive
-> Ask me about magnetics...
-> What is the reluctance of...?
-```
-
-### 4. **Web Interface**
-Build a simple Flask/FastAPI frontend:
-- Chat interface to the agent
-- Real-time tool call visualization
-- Export results to PDF reports
-
-### 5. **Domain-Specific Language (DSL)**
-Parse structured design specs:
-```
-solenoid {
-  turns: 1000
-  wire_gauge: 24
-  length_mm: 50
-  core: iron
-  frequency_hz: 60
-}
-→ Estimate DC resistance, inductance, power loss
-```
-
----
-
 ## Testing
 
 This project includes comprehensive tests covering:
@@ -471,28 +400,6 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 python agent/agent.py
 ```
 
-### "MCP server failed to start"
-Check that Python is in your PATH and `mcp_server/server.py` is readable:
-```bash
-python mcp_server/server.py
-# Should run without errors and accept stdin
-```
-
-### Tests fail with import errors
-Ensure dependencies are installed and PYTHONPATH includes the project root:
-```bash
-pip install -r requirements.txt
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-pytest tests/ -v
-```
-
-### Slow agent response
-The agent makes real API calls to Anthropic. If responses are slow:
-- Check your internet connection
-- Verify `ANTHROPIC_API_KEY` is valid
-- Reduce the number of example queries in `agent.py`
-
----
 
 ## Dependencies
 
@@ -505,24 +412,9 @@ The agent makes real API calls to Anthropic. If responses are slow:
 
 ---
 
-## License
-
-This is a portfolio project. Use, modify, and extend as needed.
-
----
-
 ## Further Reading
 
 - **Maxwell's Equations**: https://en.wikipedia.org/wiki/Maxwell%27s_equations
 - **Magnetic Circuit Design**: Textbooks on electromagnetics (Griffiths, Jackson)
 - **MCP Specification**: https://modelcontextprotocol.io
 - **Anthropic SDK**: https://github.com/anthropics/anthropic-sdk-python
-
----
-
-## Contact & Support
-
-For questions or improvements, consider:
-1. Reviewing the code and docstrings
-2. Running the test suite to verify functionality
-3. Extending with your own physics tools or domains
