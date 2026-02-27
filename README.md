@@ -1,67 +1,76 @@
-# Magnetics SME Agent + MCP Server
+# Maxwell Bot: Skill-Agnostic AI Agent Framework
 
-A sample project demonstrating an AI agent with domain expertise in electromagnetics and magnetics, powered by a custom MCP (Model Context Protocol) server that provides physics computation tools.
+A sample project demonstrating a skill-agnostic AI agent that dynamically loads domain expertise from markdown skill definitions, with an example magnetics/electromagnetics SME skill.
 
 ## Project Overview
 
-This project showcases a subject matter expert AI agent that leverages the Anthropic SDK and a custom MCP server to perform expert-level analysis and calculations in electromagnetics. The agent understands Maxwell's equations, magnetic circuit design, material properties, and can reason through complex physics problems using real equations and precise numerical computations.
+This project showcases a generic agent framework that can work with any domain expertise by loading tool definitions and system prompts from skill.md files. The magnetics example demonstrates how to build an expert-level AI agent for electromagnetics and magnetic circuit design using real equations and precise numerical computations.
 
 Key features:
+- **Skill-agnostic architecture** - works with any domain by loading from skill.md files
 - **Hand-rolled agentic loop** (no framework dependencies) for transparent agent reasoning
-- **Custom MCP server** as a separate subprocess communicating via stdio (not mocked functions)
+- **Dynamic tool discovery** - parses tool schemas directly from skill.md markdown
 - **Real physics equations** with SI unit constants (e.g., μ₀ = 4π×10⁻⁷ H/m)
-- **8 specialized physics tools** for field calculations, circuit analysis, and unit conversions
-- **SME system prompt** that guides Claude's reasoning toward rigorous engineering principles
+- **8 specialized magnetics tools** for field calculations, circuit analysis, and unit conversions
+- **Configuration-driven design** - change agent behavior by editing skill.md, no code changes needed
 - **Comprehensive test suite** validating all tools and calculations
 
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│   Agent (Anthropic SDK)         │
-│   - Agentic loop                │
-│   - Tool orchestration          │
-│   - SME system prompt           │
-└──────────────┬──────────────────┘
-               │
-        stdio (JSON-RPC)
-               │
-┌──────────────▼──────────────────┐
-│   MCP Server (subprocess)       │
-│   - Tool discovery & dispatch   │
-│   - stdio transport             │
-└──────────────┬──────────────────┘
-               │
-     ┌─────────┴──────────┬──────────────┬──────────┐
-     │                    │              │          │
-┌────▼────┐  ┌─────────┐ ┌────────────┐ ┌────────┐ │
-│ Fields  │  │Circuits │ │ Materials  │ │Convert │ │
-│ Tools   │  │ Tools   │ │ Lookup     │ │ Units  │ │
-└─────────┘  └─────────┘ └────────────┘ └────────┘ │
+┌──────────────────────────────────────┐
+│   CLI (cli.py)                       │
+│   - Skill selection & discovery      │
+│   - Interactive chat interface       │
+└────────────────┬─────────────────────┘
+                 │
+┌────────────────▼─────────────────────┐
+│   SkillAgent (Anthropic SDK)         │
+│   - Agentic loop                     │
+│   - Tool orchestration               │
+│   - skill.md parsing & loading       │
+└────────────────┬─────────────────────┘
+                 │
+        ┌────────▼─────────┐
+        │  Skills/         │
+        │  <skill-name>/   │
+        │  - skill.md      │
+        │  - tool configs  │
+        └────────┬─────────┘
+                 │
+     ┌───────────┴───────────┬──────────────┐
+     │                       │              │
+┌────▼─────┐  ┌─────────┐ ┌─┴──────────┐ ┌─┴──────┐
+│ Fields   │  │Circuits │ │ Materials  │ │Convert │
+│ (fields) │  │(circuits)│ │ (materials)│ │(units) │
+└──────────┘  └─────────┘ └────────────┘ └────────┘
 ```
 
 ## Project Structure
 
 ```
-magnetics-sme/
+maxwell_bot/
 ├── agent/
-│   ├── agent.py               # SME agent with agentic loop & interactive chat
+│   ├── agent.py               # SkillAgent: generic, skill-agnostic framework
 │   └── __init__.py
 ├── mcp_server/
 │   ├── tools/
 │   │   ├── fields.py          # B/H field calculations (solenoid, wire, flux, energy)
 │   │   ├── circuits.py        # Reluctance, MMF calculations
-│   │   ├── materials.py       # Material property lookup (6 common materials)
+│   │   ├── materials.py       # Material property lookup (6 materials)
 │   │   ├── converters.py      # Unit conversions (T↔Gauss, Wb↔Maxwell, etc.)
 │   │   └── __init__.py
 │   └── __init__.py
+├── skills/
+│   └── maxwell_magnetics/
+│       └── skill.md           # Skill definition: tool reference, use cases, boundaries
 ├── tests/
 │   ├── test_fields.py         # Field calculation tests
 │   ├── test_circuits.py       # Circuit calculation tests
 │   ├── test_materials.py      # Material lookup tests
 │   ├── test_converters.py     # Conversion tests
 │   └── __init__.py
-├── SYSTEM_PROMPT.md           # Agent skill definition (reusable prompt)
+├── cli.py                     # Interactive CLI entry point
 ├── requirements.txt           # Python dependencies
 ├── .gitignore
 └── README.md                  # This file
@@ -111,36 +120,63 @@ export ANTHROPIC_API_KEY="your-key-here"
 ### Interactive Chat Interface
 
 ```bash
-python agent/agent.py
+python cli.py
 ```
 
 This launches an interactive chat where you can:
-- Select from 5 example prompts (by number 1-5)
+- Select from available skills (if multiple exist)
+- Choose from 5 example prompts (by number 1-5)
 - Type your own custom questions
 - See animated thinking spinner while Claude responds
 - Type `quit` or `exit` to exit
 
-The agent loads its expertise from `SYSTEM_PROMPT.md`, which defines its knowledge domain and reasoning approach.
+The agent auto-discovers skills from the `skills/` directory and loads tool definitions and expertise from each skill's `skill.md` file.
 
-## Agent Skill Definition (SYSTEM_PROMPT.md)
+## Skill Definition Files (skill.md)
 
-The `SYSTEM_PROMPT.md` file functions as a **reusable skill definition**:
+Each skill lives in `skills/<skill-name>/` with a `skill.md` file that defines:
 
-- **Defines domain expertise**: Maxwell's equations, magnetic circuits, material properties
-- **Specifies reasoning approach**: Identify principle → Apply tools → Explain reasoning → Include units
-- **Guides behavior**: Tone, assumptions, available resources
-- **Easy to customize**: Edit the markdown file without touching code
+- **Use Case Decision Table**: Maps problem types to appropriate tools
+- **Tool Reference**: Complete tool specifications with:
+  - Input/output schemas (parsed automatically by the agent)
+  - Use cases and assumptions
+  - Physics equations and constants
+- **Boundaries & Constraints**: What the agent can/cannot do
+- **Gotchas & Common Mistakes**: User guidance for typical errors
+- **Physics Foundations**: Key equations and reference constants
+- **Recommended Workflow**: Step-by-step reasoning guide
 
-To modify the agent's expertise or behavior, simply edit `SYSTEM_PROMPT.md`. The agent will load the updated definition on next run. This pattern mirrors how Claude Code handles skill definitions—keeping the "what" (skill definition) separate from the "how" (implementation).
+### Key Design Pattern
+
+The agent is **completely skill-agnostic**:
+- Tool definitions are **parsed from skill.md** (not hardcoded)
+- System prompts are **loaded from skill.md**
+- To add a new skill: create `skills/<name>/skill.md` with proper format
+- To modify behavior: edit skill.md, no code changes needed
+
+This separation of "what" (skill definition) from "how" (agent implementation) makes the framework flexible and reusable.
 
 ### Example Output:
 ```
-Starting MCP server...
-✓ MCP server started with 8 tools
+✓ Agent initialized with skill: maxwell_magnetics
+✓ Loaded 8 tools
+
+======================================================================
+SKILL AGENT - MAXWELL_MAGNETICS
+======================================================================
+
+Example prompts you can use:
+  1. What is the magnetic field at the center of a solenoid with 500 turns, 20cm long, carrying 2A?
+  2. I'm designing a magnetic circuit with a 10cm iron core (μr=5000), 2cm² cross-section. What is the reluctance?
+  3. How much energy is stored in a 50mT field occupying 0.5 liters?
+  4. Compare the permeability of silicon steel vs ferrite.
+  5. Convert 1.2 Tesla to Gauss.
 
 ======================================================================
 User: What is the magnetic field at the center of a solenoid with 500 turns, 20cm long, carrying 2A?
 ======================================================================
+
+🧠 Thinking...
 
 Agent: I'll calculate the magnetic field at the center of the solenoid using the formula B = μ₀ · n · I...
 
@@ -152,10 +188,6 @@ Agent: I'll calculate the magnetic field at the center of the solenoid using the
    }
    Result: {
      "B_tesla": 0.006283185307179586,
-     "turns": 500,
-     "length_m": 0.2,
-     "current_A": 2.0,
-     "turns_per_meter": 2500,
      "equation": "B = μ₀ · n · I"
    }
 
@@ -409,8 +441,18 @@ pytest tests/ -v --tb=short
 Ensure your API key is set:
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
-python agent/agent.py
+python cli.py
 ```
+
+### "No skills found in skills/ directory"
+Ensure your skill is properly structured:
+```
+skills/
+└── <skill-name>/
+    └── skill.md
+```
+
+The agent auto-discovers skills by looking for `skill.md` files in subdirectories of `skills/`.
 
 
 ## Dependencies
@@ -418,7 +460,6 @@ python agent/agent.py
 | Package | Purpose |
 |---------|---------|
 | `anthropic>=0.25.0` | Anthropic Python SDK (Claude API) |
-| `mcp>=1.0.0` | Model Context Protocol SDK |
 | `pytest>=7.4.0` | Test framework |
 | `pytest-asyncio>=0.21.0` | Async test support |
 
