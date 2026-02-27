@@ -240,25 +240,61 @@ numerical computation is required rather than estimating by hand."""
 
 
 def main():
-    """Main entry point."""
+    """Main entry point with interactive chat."""
     agent = MagneticsSMEAgent()
 
     print(f"✓ Agent initialized with {len(agent.tools)} tools\n")
 
-    # Example questions
-    test_queries = [
+    # Example prompts
+    examples = [
         "What is the magnetic field at the center of a solenoid with 500 turns, 20cm long, carrying 2A?",
         "I'm designing a magnetic circuit with a 10cm iron core (μr=5000), 2cm² cross-section. What is the reluctance?",
         "How much energy is stored in a 50mT field occupying 0.5 liters?",
+        "Compare the permeability of silicon steel vs ferrite.",
+        "Convert 1.2 Tesla to Gauss.",
     ]
 
+    print("=" * 70)
+    print("MAGNETICS SME AGENT - Interactive Chat")
+    print("=" * 70)
+    print("\nExample prompts you can use:")
+    for i, example in enumerate(examples, 1):
+        print(f"  {i}. {example}")
+    print("\nOr type your own question about electromagnetics and magnetics.")
+    print("Type 'quit' or 'exit' to exit.\n")
+
     try:
-        for query in test_queries:
-            agent.run_agentic_loop(query)
-            print("\n")
+        while True:
+            # Get user input
+            user_input = input("You: ").strip()
+
+            if not user_input:
+                continue
+
+            # Check for exit commands
+            if user_input.lower() in ["quit", "exit", "q"]:
+                print("\nGoodbye!")
+                break
+
+            # Check if user selected an example by number
+            try:
+                choice = int(user_input)
+                if 1 <= choice <= len(examples):
+                    user_input = examples[choice - 1]
+                    print(f"Selected: {user_input}\n")
+                else:
+                    print(f"Invalid choice. Please select 1-{len(examples)} or type a question.\n")
+                    continue
+            except ValueError:
+                # Not a number, treat as user's question
+                pass
+
+            # Run the agentic loop
+            agent.run_agentic_loop(user_input)
+            print("\n" + "-" * 70 + "\n")
 
     except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
+        print("\n\nGoodbye!")
 
 
 if __name__ == "__main__":
