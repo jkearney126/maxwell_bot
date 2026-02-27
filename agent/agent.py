@@ -13,6 +13,7 @@ from anthropic import Anthropic
 
 # Import tools dynamically
 from mcp_server.tools import fields, circuits, materials, converters
+from agent.knowledge_base import KnowledgeBase
 
 
 class ThinkingSpinner:
@@ -68,6 +69,7 @@ class SkillAgent:
         )
         self.skill_md = self._load_skill_md()
         self.tools = self._setup_tools()
+        self.knowledge_base = KnowledgeBase(self.skill_dir)
 
     @staticmethod
     def _discover_skills() -> list:
@@ -282,12 +284,12 @@ class SkillAgent:
         except Exception as e:
             return json.dumps({"error": f"Tool execution failed: {str(e)}"})
 
-    def get_system_prompt(self) -> str:
+    def get_system_prompt(self, user_message: str = None) -> str:
         """
-        Generate system prompt from skill.md.
+        Generate system prompt from skill.md with optional RAG context.
 
-        In production, this would parse the skill.md file to create a dynamic prompt.
-        For now, it uses the skill.md as context.
+        Args:
+            user_message: User's question for RAG retrieval (optional)
         """
         base_prompt = """You are an expert agent with specialized knowledge and capabilities.
 
@@ -296,7 +298,16 @@ You have access to the following tools to help solve problems. Use them whenever
 Here is your skill definition:
 
 """
-        return base_prompt + self.skill_md
+        prompt = base_prompt + self.skill_md
+
+        # Add retrieved knowledge context if user message provided
+        if user_message:
+            retrieved_docs = self.knowledge_base.retrieve(user_message, top_k=3)
+            if retrieved_docs:
+                knowledge_context = self.knowledge_base.format_context(retrieved_docs)
+                prompt += knowledge_context
+
+        return prompt
 
     def run_agentic_loop(self, user_message: str) -> None:
         """Run the main agentic loop."""
@@ -315,7 +326,7 @@ Here is your skill definition:
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=4096,
-                system=self.get_system_prompt(),
+                system=self.get_system_prompt(user_message),
                 tools=self.tools,
                 messages=messages,
             )
