@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+from itertools import cycle
 
 # Add parent directory to path so we can import mcp_server
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,6 +14,28 @@ from anthropic import Anthropic
 
 # Import tools directly
 from mcp_server.tools import fields, circuits, materials, converters
+
+
+class ThinkingSpinner:
+    """Simple animated spinner for showing model is thinking."""
+
+    def __init__(self):
+        """Initialize spinner."""
+        self.spinner_frames = cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+        self.message = "🧠 Claude is thinking"
+
+    def start(self):
+        """Print initial thinking message."""
+        print(f"\n{self.message}...", end="", flush=True)
+
+    def tick(self):
+        """Update spinner frame."""
+        frame = next(self.spinner_frames)
+        print(f"\r{frame} {self.message}...", end="", flush=True)
+
+    def stop(self):
+        """Clear the spinner line."""
+        print("\r" + " " * 50 + "\r", end="", flush=True)
 
 
 class MagneticsSMEAgent:
@@ -183,6 +206,10 @@ numerical computation is required rather than estimating by hand."""
         print(f"{'='*70}\n")
 
         while True:
+            # Show spinner while thinking
+            spinner = ThinkingSpinner()
+            spinner.start()
+
             # Call Claude with tools
             response = self.client.messages.create(
                 model=self.model,
@@ -191,6 +218,8 @@ numerical computation is required rather than estimating by hand."""
                 tools=self.tools,
                 messages=messages,
             )
+
+            spinner.stop()
 
             # Check stop reason
             if response.stop_reason == "end_turn":
