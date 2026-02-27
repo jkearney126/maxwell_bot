@@ -10,6 +10,7 @@ Key features:
 - **Skill-agnostic architecture** - works with any domain by loading from skill.md files
 - **Hand-rolled agentic loop** (no framework dependencies) for transparent agent reasoning
 - **Dynamic tool discovery** - parses tool schemas directly from skill.md markdown
+- **Retrieval-augmented generation (RAG)** - Chroma vector database with semantic search over domain knowledge
 - **Real physics equations** with SI unit constants (e.g., μ₀ = 4π×10⁻⁷ H/m)
 - **8 specialized magnetics tools** for field calculations, circuit analysis, and unit conversions
 - **Configuration-driven design** - change agent behavior by editing skill.md, no code changes needed
@@ -155,6 +156,54 @@ The agent is **completely skill-agnostic**:
 - To modify behavior: edit skill.md, no code changes needed
 
 This separation of "what" (skill definition) from "how" (agent implementation) makes the framework flexible and reusable.
+
+## Knowledge Base & Retrieval-Augmented Generation (RAG)
+
+Each skill can include a knowledge base of domain documents to augment agent responses with relevant context.
+
+### How It Works
+
+1. **Vector Database**: Uses Chroma with semantic embeddings (all-MiniLM-L6-v2)
+2. **Automatic Indexing**: Markdown files in `skills/<skill>/knowledge/` are indexed on first load
+3. **Semantic Search**: When user queries, top-3 most relevant document chunks are retrieved
+4. **Context Injection**: Retrieved knowledge is appended to system prompt before Claude API call
+
+### Adding Knowledge Documents
+
+Create markdown files in `skills/<skill-name>/knowledge/`:
+
+```
+skills/
+└── maxwell_magnetics/
+    ├── skill.md
+    └── knowledge/
+        ├── real_world_applications.md
+        ├── design_mistakes_troubleshooting.md
+        ├── materials_and_components.md
+        └── standards_and_safety.md
+```
+
+**Document Format**:
+- Use `## Section Title` headers for automatic chunking
+- Each chunk becomes searchable (improves relevance ranking)
+- Include practical, complementary information (not just duplicating skill.md)
+
+### Example: Magnetics Knowledge Base
+
+The included magnetics skill has 4 knowledge documents covering:
+
+- **Real-World Applications** - MRI systems, transformers, motors, relays, speakers
+- **Design Mistakes & Troubleshooting** - Common failures, thermal drift, saturation issues
+- **Materials & Components** - Real costs, specifications, performance tradeoffs
+- **Standards & Safety** - Regulatory requirements, compliance paths, EMC/RoHS
+
+Result: 33 semantic chunks indexed, ~80% relevance for domain-specific queries
+
+### Storage & Persistence
+
+- Vector database stored in `skills/<skill>/.chroma_db/`
+- Automatic persistence: survives process restarts
+- One collection per skill, allowing multi-skill deployments
 
 ### Example Output:
 ```
@@ -460,6 +509,8 @@ The agent auto-discovers skills by looking for `skill.md` files in subdirectorie
 | Package | Purpose |
 |---------|---------|
 | `anthropic>=0.25.0` | Anthropic Python SDK (Claude API) |
+| `chromadb>=0.4.0` | Vector database for RAG (Chroma) |
+| `sentence-transformers>=3.0.0` | Semantic embeddings for retrieval |
 | `pytest>=7.4.0` | Test framework |
 | `pytest-asyncio>=0.21.0` | Async test support |
 
