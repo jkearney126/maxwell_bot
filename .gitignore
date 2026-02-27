@@ -39,3 +39,7 @@ wheels/
 .coverage
 htmlcov/
 .tox/
+
+# Vector databases & cached embeddings
+.chroma_db/
+.cache/
