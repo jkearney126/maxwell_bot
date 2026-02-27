@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Magnetics SME Agent using Anthropic SDK."""
+"""Generic Agent Framework - auto-discovers and loads skills."""
 
-import asyncio
 import json
 import os
 import sys
 from itertools import cycle
 
-# Add parent directory to path so we can import mcp_server
+# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from anthropic import Anthropic
 
-# Import tools directly
+# Import tools dynamically
 from mcp_server.tools import fields, circuits, materials, converters
 
 
@@ -22,33 +21,89 @@ class ThinkingSpinner:
     def __init__(self):
         """Initialize spinner."""
         self.spinner_frames = cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-        self.message = "🧠 Claude is thinking"
+        self.message = "🧠 Thinking"
 
     def start(self):
         """Print initial thinking message."""
         print(f"\n{self.message}...", end="", flush=True)
-
-    def tick(self):
-        """Update spinner frame."""
-        frame = next(self.spinner_frames)
-        print(f"\r{frame} {self.message}...", end="", flush=True)
 
     def stop(self):
         """Clear the spinner line."""
         print("\r" + " " * 50 + "\r", end="", flush=True)
 
 
-class MagneticsSMEAgent:
-    """Agent with expertise in magnetics/electromagnetics."""
+class SkillAgent:
+    """Generic agent that auto-discovers and loads skills."""
 
-    def __init__(self):
-        """Initialize the agent."""
+    def __init__(self, skill_name: str = None):
+        """
+        Initialize agent with a specific skill or auto-discover.
+
+        Args:
+            skill_name: Name of the skill directory. If None, uses first available skill.
+        """
         self.client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         self.model = "claude-sonnet-4-6"
+
+        # Discover available skills
+        self.available_skills = self._discover_skills()
+
+        if not self.available_skills:
+            raise RuntimeError(f"No skills found in skills/ directory")
+
+        # Use provided skill or default to first
+        if skill_name is None:
+            self.skill_name = self.available_skills[0]
+        else:
+            if skill_name not in self.available_skills:
+                raise ValueError(
+                    f"Skill '{skill_name}' not found. Available: {', '.join(self.available_skills)}"
+                )
+            self.skill_name = skill_name
+
+        self.skill_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "skills",
+            self.skill_name,
+        )
         self.tools = self._setup_tools()
+        self.skill_md = self._load_skill_md()
+
+    @staticmethod
+    def _discover_skills() -> list:
+        """Discover all available skills in skills/ directory."""
+        skills_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "skills",
+        )
+
+        if not os.path.exists(skills_dir):
+            return []
+
+        skills = []
+        for item in os.listdir(skills_dir):
+            skill_path = os.path.join(skills_dir, item)
+            # Check if it's a directory with a skill.md file
+            if os.path.isdir(skill_path):
+                skill_file = os.path.join(skill_path, "skill.md")
+                if os.path.exists(skill_file):
+                    skills.append(item)
+
+        return sorted(skills)
+
+    def _load_skill_md(self) -> str:
+        """Load skill definition from skill.md file."""
+        skill_path = os.path.join(self.skill_dir, "skill.md")
+        try:
+            with open(skill_path, "r") as f:
+                return f.read()
+        except FileNotFoundError:
+            return f"Skill '{self.skill_name}' not found at {skill_path}"
 
     def _setup_tools(self) -> list:
-        """Set up tool definitions for Claude."""
+        """Set up tool definitions. In a real system, these would be parsed from skill.md."""
+        # Hardcoded for magnetics-sme for now
+        # In a production system, these would be extracted from skill.md
         return [
             {
                 "name": "solenoid_field",
@@ -178,17 +233,20 @@ class MagneticsSMEAgent:
             return json.dumps({"error": f"Tool execution failed: {str(e)}"})
 
     def get_system_prompt(self) -> str:
-        """Load system prompt from SYSTEM_PROMPT.md file."""
-        prompt_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "SYSTEM_PROMPT.md"
-        )
-        try:
-            with open(prompt_path, "r") as f:
-                return f.read()
-        except FileNotFoundError:
-            # Fallback prompt if file not found
-            return "You are an expert in electromagnetics and magnetics. Use the available tools to help solve physics problems."
+        """
+        Generate system prompt from skill.md.
+
+        In production, this would parse the skill.md file to create a dynamic prompt.
+        For now, it uses the skill.md as context.
+        """
+        base_prompt = """You are an expert agent with specialized knowledge and capabilities.
+
+You have access to the following tools to help solve problems. Use them whenever appropriate.
+
+Here is your skill definition:
+
+"""
+        return base_prompt + self.skill_md
 
     def run_agentic_loop(self, user_message: str) -> None:
         """Run the main agentic loop."""
@@ -259,65 +317,3 @@ class MagneticsSMEAgent:
             else:
                 print(f"Unexpected stop reason: {response.stop_reason}")
                 break
-
-
-def main():
-    """Main entry point with interactive chat."""
-    agent = MagneticsSMEAgent()
-
-    print(f"✓ Agent initialized with {len(agent.tools)} tools\n")
-
-    # Example prompts
-    examples = [
-        "What is the magnetic field at the center of a solenoid with 500 turns, 20cm long, carrying 2A?",
-        "I'm designing a magnetic circuit with a 10cm iron core (μr=5000), 2cm² cross-section. What is the reluctance?",
-        "How much energy is stored in a 50mT field occupying 0.5 liters?",
-        "Compare the permeability of silicon steel vs ferrite.",
-        "Convert 1.2 Tesla to Gauss.",
-    ]
-
-    print("=" * 70)
-    print("MAGNETICS SME AGENT - Interactive Chat")
-    print("=" * 70)
-    print("\nExample prompts you can use:")
-    for i, example in enumerate(examples, 1):
-        print(f"  {i}. {example}")
-    print("\nOr type your own question about electromagnetics and magnetics.")
-    print("Type 'quit' or 'exit' to exit.\n")
-
-    try:
-        while True:
-            # Get user input
-            user_input = input("You: ").strip()
-
-            if not user_input:
-                continue
-
-            # Check for exit commands
-            if user_input.lower() in ["quit", "exit", "q"]:
-                print("\nGoodbye!")
-                break
-
-            # Check if user selected an example by number
-            try:
-                choice = int(user_input)
-                if 1 <= choice <= len(examples):
-                    user_input = examples[choice - 1]
-                    print(f"Selected: {user_input}\n")
-                else:
-                    print(f"Invalid choice. Please select 1-{len(examples)} or type a question.\n")
-                    continue
-            except ValueError:
-                # Not a number, treat as user's question
-                pass
-
-            # Run the agentic loop
-            agent.run_agentic_loop(user_input)
-            print("\n" + "-" * 70 + "\n")
-
-    except KeyboardInterrupt:
-        print("\n\nGoodbye!")
-
-
-if __name__ == "__main__":
-    main()
